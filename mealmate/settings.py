@@ -16,6 +16,9 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 import os
+from pathlib import Path
+from decouple import config
+import dj_database_url
 from dotenv import load_dotenv
 load_dotenv()
 
