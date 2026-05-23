@@ -34,3 +34,4 @@ python-decouple
 psycopg2-binary
 cloudinary
 django-cloudinary-storage
+Pillow==10.4.0
