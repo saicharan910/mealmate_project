@@ -33,7 +33,7 @@ SECRET_KEY = 'rzp_test_SmVdSeE4ZSIxko'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['*'] #['saicharan01.pythonanywhere.com', '127.0.0.1']
+ALLOWED_HOSTS = ['*','mealmate-project.onrender.com'] #['saicharan01.pythonanywhere.com', '127.0.0.1']
 
 
 # Application definition
