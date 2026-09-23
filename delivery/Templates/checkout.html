@@ -272,6 +272,7 @@
             <strong id="total-display" class="summary-amount">₹0.00</strong>
         </div>
 
+        <form id="payment-form" style="display:none;">{% csrf_token %}</form>
         <button id="rzp-button" class="btn-pay">
             Pay with Razorpay
         </button>
@@ -297,8 +298,27 @@
             "description": "Order Payment",
             "order_id": orderId,
             "handler": function (response) {
-                const redirectUrl = "{% url 'orders' 'placeholder_username' %}".replace('placeholder_username', encodeURIComponent(username));
-                window.location.href = redirectUrl;
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = "{% url 'payment' %}";
+
+                const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]")?.value;
+                [
+                    ["razorpay_payment_id", response.razorpay_payment_id],
+                    ["razorpay_order_id", response.razorpay_order_id],
+                    ["razorpay_signature", response.razorpay_signature],
+                    ["username", username],
+                    ["csrfmiddlewaretoken", csrfToken]
+                ].forEach(([name, value]) => {
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = name;
+                    input.value = value || "";
+                    form.appendChild(input);
+                });
+
+                document.body.appendChild(form);
+                form.submit();
             },
             "prefill": {
                 "name": username,
