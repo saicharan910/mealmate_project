@@ -74,9 +74,21 @@ class Order(models.Model):
     )
     items = models.ManyToManyField(Item, related_name="orders")
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
-    razorpay_order_id = models.CharField(max_length=100, blank=True)
-    razorpay_payment_id = models.CharField(max_length=100, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    razorpay_order_id = models.CharField(
+        max_length=100,
+        blank=True,
+        db_index=True,
+    )
+    razorpay_payment_id = models.CharField(
+        max_length=100,
+        blank=True,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending",
+        db_index=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
