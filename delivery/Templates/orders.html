@@ -26,7 +26,13 @@
                 style="font-family: var(--font-heading); font-size: 2.25rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.5rem; line-height: 1.15;">
                 Thank you for your order, {{ username }}!
             </h1>
-            <span class="badge badge-emerald">Order Verified</span>
+            {% if order and order.status == "paid" %}
+            <span class="badge badge-emerald">Payment Confirmed</span>
+            {% elif order and order.status == "pending" %}
+            <span class="badge">Payment Pending</span>
+            {% else %}
+            <span class="badge">Order Status</span>
+            {% endif %}
         </header>
 
         <section
@@ -42,13 +48,19 @@
 
         <p
             style="color: var(--text-secondary); text-align: center; margin-bottom: 2.5rem; font-size: 0.95rem; line-height: 1.6;">
-            Your order has been registered and is currently being prepared. It will arrive shortly. Thank you for
-            choosing Meal Mate!
+            {% if order and order.status == "paid" %}
+            Your payment has been verified and your order has been registered successfully.
+            Thank you for choosing Meal Mate!
+            {% elif order and order.status == "pending" %}
+            Your order is awaiting payment confirmation.
+            {% else %}
+            Your latest order could not be completed.
+            {% endif %}
         </p>
 
         <div style="text-align: center;">
-            {% if cart_items %}
-            <a href="{% url 'view_menu' cart_items.0.restaurant.id username %}" class="btn btn-emerald"
+            {% if order_items %}
+            <a href="{% url 'customer_home' username %}" class="btn btn-emerald"
                 style="width: 100%; padding: 1rem;">
                 Back to Restaurants
             </a>
