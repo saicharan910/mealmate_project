@@ -72,7 +72,6 @@ class Order(models.Model):
         on_delete=models.PROTECT,
         related_name="orders",
     )
-    items = models.ManyToManyField(Item, related_name="orders")
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
     razorpay_order_id = models.CharField(
         max_length=100,
@@ -93,3 +92,26 @@ class Order(models.Model):
 
     def __str__(self):
         return f"Order #{self.pk} - {self.customer.username}"
+
+
+class OrderItem(models.Model):
+    order = models.ForeignKey(
+        Order,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    item = models.ForeignKey(
+        Item,
+        on_delete=models.PROTECT,
+        related_name="order_items",
+    )
+    item_name = models.CharField(max_length=100)
+    unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    quantity = models.PositiveIntegerField(default=1)
+
+    @property
+    def line_total(self):
+        return self.unit_price * self.quantity
+
+    def __str__(self):
+        return f"{self.item_name} x {self.quantity}"
