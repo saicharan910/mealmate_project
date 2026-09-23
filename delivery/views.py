@@ -544,6 +544,8 @@ def checkout(request, username):
         "checkout.html",
         {
             "username": username,
+            "customer_email": session_customer.email,
+            "customer_mobile": session_customer.mobile,
             "cart_items": items,
             "subtotal": subtotal,
             "gst": gst,
