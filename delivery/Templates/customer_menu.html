@@ -309,10 +309,13 @@
                             {% endif %}
                         </td>
                         <td style="text-align: right;">
-                            <a href="{% url 'add_to_cart' item.id username %}" class="btn btn-orange"
-                                style="padding: 0.6rem 1.2rem; font-size: 0.8rem; box-shadow: none;">
-                                Add to cart
-                            </a>
+                            <form action="{% url 'add_to_cart' item.id username %}" method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-orange"
+                                    style="padding: 0.6rem 1.2rem; font-size: 0.8rem; box-shadow: none;">
+                                    Add to cart
+                                </button>
+                            </form>
                         </td>
                     </tr>
                     {% endfor %}
