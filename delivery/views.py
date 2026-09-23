@@ -9,7 +9,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from .models import Cart, Customer, Item, Order, Restaurant
+from .models import Cart, Customer, Item, Order, OrderItem, Restaurant
 
 logger = logging.getLogger(__name__)
 
@@ -470,7 +470,18 @@ def checkout(request, username):
         status="pending",
     )
 
-    pending_order.items.set(items)
+    OrderItem.objects.bulk_create(
+        [
+            OrderItem(
+                order=pending_order,
+                item=item,
+                item_name=item.name,
+                unit_price=item.price,
+                quantity=1,
+            )
+            for item in items
+        ]
+    )
 
     client = razorpay.Client(
         auth=(
@@ -729,11 +740,13 @@ def payment_view(request):
 
         if cart:
             order_items = list(
-                locked_order.items.all()
+                locked_order.items.select_related("item").all()
             )
 
             if order_items:
-                cart.items.remove(*order_items)
+                cart.items.remove(
+                    *(order_item.item for order_item in order_items)
+                )
 
     return redirect(
         "orders",
@@ -761,7 +774,7 @@ def orders(request, username):
             "username": username,
             "customer": customer,
             "order": order,
-            "cart_items": (
+            "order_items": (
                 order.items.all()
                 if order
                 else []
