@@ -58,3 +58,26 @@ class Cart(models.Model):
 
     def __str__(self):
         return f"{self.customer.username} - ₹{self.total_price()}"
+
+
+class Order(models.Model):
+    STATUS_CHOICES = [
+        ("paid", "Paid"),
+        ("pending", "Pending"),
+        ("failed", "Failed"),
+    ]
+
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="orders",
+    )
+    items = models.ManyToManyField(Item, related_name="orders")
+    total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    razorpay_order_id = models.CharField(max_length=100, blank=True)
+    razorpay_payment_id = models.CharField(max_length=100, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Order #{self.pk} - {self.customer.username}"
