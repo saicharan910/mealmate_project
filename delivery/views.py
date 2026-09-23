@@ -185,7 +185,7 @@ def update_menu(request, restaurant_id):
         name=name,
         description=request.POST.get("description", "").strip(),
         price=request.POST.get("price") or 0,
-        vegeterian=request.POST.get("is_veg") == "on",
+        vegeterian=request.POST.get("vegeterian") == "on" or request.POST.get("is_veg") == "on",
         picture=request.POST.get("picture", "").strip(),
     )
     return redirect("open_update_menu", restaurant_id=restaurant_id)
