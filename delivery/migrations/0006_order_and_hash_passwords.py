@@ -3,12 +3,14 @@ import django.db.models.deletion
 
 
 def hash_existing_passwords(apps, schema_editor):
-    from django.contrib.auth.hashers import make_password
+    from django.contrib.auth.hashers import identify_hasher, make_password
 
     Customer = apps.get_model("delivery", "Customer")
 
     for customer in Customer.objects.all().iterator():
-        if not customer.password.startswith(("pbkdf2_", "argon2$", "bcrypt$", "scrypt$")):
+        try:
+            identify_hasher(customer.password)
+        except ValueError:
             customer.password = make_password(customer.password)
             customer.save(update_fields=["password"])
 
