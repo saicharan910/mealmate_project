@@ -283,12 +283,16 @@
     {{ amount_paise|json_script:"amount-paise" }}
     {{ order_id|json_script:"order-id" }}
     {{ username|json_script:"username" }}
+    {{ customer_email|json_script:"customer-email" }}
+    {{ customer_mobile|json_script:"customer-mobile" }}
 
     <script>
         const razorpayKeyId = JSON.parse(document.getElementById('razorpay-key-id').textContent);
         const amountPaise = JSON.parse(document.getElementById('amount-paise').textContent);
         const orderId = JSON.parse(document.getElementById('order-id').textContent);
         const username = JSON.parse(document.getElementById('username').textContent);
+        const customerEmail = JSON.parse(document.getElementById('customer-email').textContent);
+        const customerMobile = JSON.parse(document.getElementById('customer-mobile').textContent);
 
         var options = {
             "key": razorpayKeyId,
@@ -322,19 +326,23 @@
             },
             "prefill": {
                 "name": username,
-                "email": "customer@example.com",
-                "contact": "9999999999"
+                "email": customerEmail || "",
+                "contact": customerMobile || ""
             },
             "theme": {
                 "color": "#017349"
             }
         };
 
-        var rzp = new Razorpay(options);
+        const paymentButton = document.getElementById('rzp-button');
 
-        document.getElementById('rzp-button').onclick = function (e) {
-            rzp.open();
-            e.preventDefault();
+        if (paymentButton && razorpayKeyId && orderId && amountPaise) {
+            const rzp = new Razorpay(options);
+
+            paymentButton.onclick = function (e) {
+                e.preventDefault();
+                rzp.open();
+            };
         }
 
         function updateCheckoutTotal() {
