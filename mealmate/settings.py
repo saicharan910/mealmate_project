@@ -14,12 +14,14 @@ if not SECRET_KEY:
 
 DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
 
-render_hostname = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
+render_hostname = os.environ.get("https://mealmate-project-9ybt.onrender.com")
 allowed_hosts = os.environ.get("ALLOWED_HOSTS", "")
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(",") if host.strip()]
+ALLOWED_HOSTS.extend(["mealmate-project-9ybt.onrender.com", "localhost", "127.0.0.1"])
 
 if render_hostname:
     ALLOWED_HOSTS.append(render_hostname)
+ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
 
 if DEBUG:
     ALLOWED_HOSTS.extend(["localhost", "127.0.0.1"])
@@ -30,6 +32,9 @@ csrf_origins = os.environ.get("CSRF_TRUSTED_ORIGINS", "")
 CSRF_TRUSTED_ORIGINS = [
     origin.strip() for origin in csrf_origins.split(",") if origin.strip()
 ]
+CSRF_TRUSTED_ORIGINS.extend([
+    "https://mealmate-project-9ybt.onrender.com",
+])
 if render_hostname:
     CSRF_TRUSTED_ORIGINS.append(f"https://{render_hostname}")
 CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(CSRF_TRUSTED_ORIGINS))
@@ -61,7 +66,9 @@ ROOT_URLCONF = "mealmate.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "delivery" / "templates"],
+        "DIRS": [BASE_DIR / "delivery" / "templates",
+                BASE_DIR / "templates",],
+        
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -73,6 +80,11 @@ TEMPLATES = [
         },
     }
 ]
+
+# Auth Redirects
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'home'
+LOGOUT_REDIRECT_URL = 'login'
 
 WSGI_APPLICATION = "mealmate.wsgi.application"
 
