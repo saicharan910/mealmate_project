@@ -4,10 +4,11 @@ from . import views
 urlpatterns = [
     # Auth & General
     path('', views.index, name='index'),
-    path('open_signup/', views.open_signup, name="open_signup"),
-    path('open_signin/', views.open_signin, name="open_signin"),
+    path('open_signup/', views.open_signup, name='open_signup'),
+    path('open_signin/', views.open_signin, name='open_signin'),
     path('signup/', views.signup, name='signup'),
     path('signin/', views.signin, name='signin'),
+    path('signout/', views.signout, name='signout'),
     path('admin_dashboard/', views.admin_dashboard, name='admin_dashboard'),
 
     # Restaurant Management
