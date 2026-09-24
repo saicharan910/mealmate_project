@@ -61,7 +61,7 @@ ROOT_URLCONF = "mealmate.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "delivery" / "Templates"],
+        "DIRS": [BASE_DIR / "delivery" / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
