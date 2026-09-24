@@ -16,21 +16,56 @@ logger = logging.getLogger(__name__)
 GST_RATE = Decimal("0.18")
 
 
+# ==============================================================================
+# Helper Methods
+# ==============================================================================
+
+def _get_session_customer(request):
+    username = request.session.get("username")
+    if not username:
+        return None
+    return Customer.objects.filter(username__iexact=username).first()
+
+
+def _is_admin(request):
+    username = request.session.get("username", "")
+    return username.lower() == "admin"
+
+
+# ==============================================================================
+# Authentication & Landing Views
+# ==============================================================================
+
 def index(request):
+    session_customer = _get_session_customer(request)
+    if session_customer:
+        if _is_admin(request):
+            return redirect("admin_dashboard")
+        return redirect("customer_home", username=session_customer.username)
     return render(request, "index.html")
 
 
 def open_signin(request):
+    session_customer = _get_session_customer(request)
+    if session_customer:
+        if _is_admin(request):
+            return redirect("admin_dashboard")
+        return redirect("customer_home", username=session_customer.username)
     return render(request, "signin.html")
 
 
 def open_signup(request):
+    session_customer = _get_session_customer(request)
+    if session_customer:
+        if _is_admin(request):
+            return redirect("admin_dashboard")
+        return redirect("customer_home", username=session_customer.username)
     return render(request, "signup.html")
 
 
 def signup(request):
     if request.method != "POST":
-        return render(request, "signup.html")
+        return redirect("open_signup")
 
     username = request.POST.get("username", "").strip()
     password = request.POST.get("password", "")
@@ -45,7 +80,7 @@ def signup(request):
             {"error": "All fields are required."},
         )
 
-    if Customer.objects.filter(username=username).exists():
+    if Customer.objects.filter(username__iexact=username).exists():
         return render(
             request,
             "signup.html",
@@ -65,12 +100,12 @@ def signup(request):
 
 def signin(request):
     if request.method != "POST":
-        return render(request, "signin.html")
+        return redirect("open_signin")
 
     username = request.POST.get("username", "").strip()
     password = request.POST.get("password", "")
 
-    customer = Customer.objects.filter(username=username).first()
+    customer = Customer.objects.filter(username__iexact=username).first()
 
     if not customer or not check_password(password, customer.password):
         return render(request, "fail.html")
@@ -84,18 +119,14 @@ def signin(request):
     return redirect("customer_home", username=customer.username)
 
 
-def _is_admin(request):
-    return request.session.get("username", "").lower() == "admin"
+def signout(request):
+    request.session.flush()
+    return redirect("open_signin")
 
 
-def _get_session_customer(request):
-    username = request.session.get("username")
-
-    if not username:
-        return None
-
-    return Customer.objects.filter(username=username).first()
-
+# ==============================================================================
+# Admin & Restaurant Management
+# ==============================================================================
 
 def admin_dashboard(request):
     if not _is_admin(request):
@@ -105,22 +136,18 @@ def admin_dashboard(request):
 
     context = {
         "total_orders": paid_orders.count(),
-        "active_users": Customer.objects.exclude(
-            username__iexact="admin"
-        ).count(),
+        "active_users": Customer.objects.exclude(username__iexact="admin").count(),
         "daily_revenue": sum(
             paid_orders.values_list("total_price", flat=True),
             Decimal("0.00"),
         ),
     }
-
     return render(request, "admin_home.html", context)
 
 
 def open_add_restaurant(request):
     if not _is_admin(request):
         return redirect("open_signin")
-
     return render(request, "add_restaurant.html")
 
 
@@ -130,18 +157,11 @@ def add_restaurant(request):
         return redirect("open_signin")
 
     name = request.POST.get("name", "").strip()
-
     if not name:
-        return HttpResponse(
-            "Restaurant name is required.",
-            status=400,
-        )
+        return HttpResponse("Restaurant name is required.", status=400)
 
-    if Restaurant.objects.filter(name=name).exists():
-        return HttpResponse(
-            "Duplicate restaurant.",
-            status=409,
-        )
+    if Restaurant.objects.filter(name__iexact=name).exists():
+        return HttpResponse("Duplicate restaurant.", status=409)
 
     Restaurant.objects.create(
         name=name,
@@ -149,14 +169,12 @@ def add_restaurant(request):
         cuisine=request.POST.get("cuisine", "").strip(),
         rating=request.POST.get("rating") or 0,
     )
-
     return redirect("open_show_restaurant")
 
 
 def open_show_restaurant(request):
     if not _is_admin(request):
         return redirect("open_signin")
-
     return render(
         request,
         "show_restaurants.html",
@@ -168,11 +186,7 @@ def open_update_restaurant(request, restaurant_id):
     if not _is_admin(request):
         return redirect("open_signin")
 
-    restaurant = get_object_or_404(
-        Restaurant,
-        id=restaurant_id,
-    )
-
+    restaurant = get_object_or_404(Restaurant, id=restaurant_id)
     return render(
         request,
         "update_restaurant.html",
@@ -185,41 +199,23 @@ def update_restaurant(request, restaurant_id):
     if not _is_admin(request):
         return redirect("open_signin")
 
-    restaurant = get_object_or_404(
-        Restaurant,
-        id=restaurant_id,
-    )
-
+    restaurant = get_object_or_404(Restaurant, id=restaurant_id)
     name = request.POST.get("name", "").strip()
 
     if not name:
-        return HttpResponse(
-            "Restaurant name is required.",
-            status=400,
-        )
+        return HttpResponse("Restaurant name is required.", status=400)
 
     if (
-        Restaurant.objects.filter(name=name)
+        Restaurant.objects.filter(name__iexact=name)
         .exclude(id=restaurant.id)
         .exists()
     ):
-        return HttpResponse(
-            "Duplicate restaurant.",
-            status=409,
-        )
+        return HttpResponse("Duplicate restaurant.", status=409)
 
     restaurant.name = name
-    restaurant.picture = request.POST.get(
-        "picture",
-        "",
-    ).strip()
-    restaurant.cuisine = request.POST.get(
-        "cuisine",
-        "",
-    ).strip()
-    restaurant.rating = request.POST.get(
-        "rating"
-    ) or 0
+    restaurant.picture = request.POST.get("picture", "").strip()
+    restaurant.cuisine = request.POST.get("cuisine", "").strip()
+    restaurant.rating = request.POST.get("rating") or 0
     restaurant.save()
 
     return redirect("open_show_restaurant")
@@ -230,23 +226,19 @@ def delete_restaurant(request, restaurant_id):
     if not _is_admin(request):
         return redirect("open_signin")
 
-    get_object_or_404(
-        Restaurant,
-        id=restaurant_id,
-    ).delete()
-
+    get_object_or_404(Restaurant, id=restaurant_id).delete()
     return redirect("open_show_restaurant")
 
+
+# ==============================================================================
+# Menu Management
+# ==============================================================================
 
 def open_update_menu(request, restaurant_id):
     if not _is_admin(request):
         return redirect("open_signin")
 
-    restaurant = get_object_or_404(
-        Restaurant,
-        id=restaurant_id,
-    )
-
+    restaurant = get_object_or_404(Restaurant, id=restaurant_id)
     return render(
         request,
         "update_menu.html",
@@ -262,51 +254,24 @@ def update_menu(request, restaurant_id):
     if not _is_admin(request):
         return redirect("open_signin")
 
-    restaurant = get_object_or_404(
-        Restaurant,
-        id=restaurant_id,
-    )
-
+    restaurant = get_object_or_404(Restaurant, id=restaurant_id)
     name = request.POST.get("name", "").strip()
-    description = request.POST.get(
-        "description",
-        "",
-    ).strip()
-    picture = request.POST.get(
-        "picture",
-        "",
-    ).strip()
-    price = request.POST.get(
-        "price",
-        "",
-    ).strip()
+    description = request.POST.get("description", "").strip()
+    picture = request.POST.get("picture", "").strip()
+    price = request.POST.get("price", "").strip()
 
     if not name or not description or not price:
-        return HttpResponse(
-            "Name, description and price are required.",
-            status=400,
-        )
+        return HttpResponse("Name, description and price are required.", status=400)
 
-    if Item.objects.filter(
-        name=name,
-        restaurant=restaurant,
-    ).exists():
-        return HttpResponse(
-            "Duplicate item in this restaurant.",
-            status=409,
-        )
+    if Item.objects.filter(name__iexact=name, restaurant=restaurant).exists():
+        return HttpResponse("Duplicate item in this restaurant.", status=409)
 
     try:
         price_value = Decimal(price)
-
         if price_value < 0:
             raise ValueError
-
     except (ValueError, TypeError, ArithmeticError):
-        return HttpResponse(
-            "Invalid item price.",
-            status=400,
-        )
+        return HttpResponse("Invalid item price.", status=400)
 
     Item.objects.create(
         restaurant=restaurant,
@@ -320,99 +285,80 @@ def update_menu(request, restaurant_id):
         picture=picture,
     )
 
-    return redirect(
-        "open_update_menu",
-        restaurant_id=restaurant_id,
+    return redirect("open_update_menu", restaurant_id=restaurant_id)
+
+
+# ==============================================================================
+# Customer Views & Cart
+# ==============================================================================
+
+def customer_home(request, username):
+    session_customer = _get_session_customer(request)
+    if not session_customer or session_customer.username.lower() != username.lower():
+        return redirect("open_signin")
+
+    return render(
+        request,
+        "customer_home.html",
+        {
+            "restaurantList": Restaurant.objects.all(),
+            "username": session_customer.username,
+        },
     )
 
 
 def view_menu(request, restaurant_id, username):
-    restaurant = get_object_or_404(
-        Restaurant,
-        id=restaurant_id,
-    )
+    session_customer = _get_session_customer(request)
+    if not session_customer:
+        return redirect("open_signin")
 
+    restaurant = get_object_or_404(Restaurant, id=restaurant_id)
     return render(
         request,
         "customer_menu.html",
         {
             "itemList": restaurant.menu_items.all(),
             "restaurant": restaurant,
-            "username": username,
+            "username": session_customer.username,
         },
     )
 
 
 @require_POST
 def add_to_cart(request, item_id, username):
-    customer = get_object_or_404(
-        Customer,
-        username=username,
-    )
+    session_customer = _get_session_customer(request)
+    if not session_customer or session_customer.username.lower() != username.lower():
+        return redirect("open_signin")
 
-    item = get_object_or_404(
-        Item,
-        id=item_id,
-    )
-
-    cart, _ = Cart.objects.get_or_create(
-        customer=customer,
-    )
-
+    item = get_object_or_404(Item, id=item_id)
+    cart, _ = Cart.objects.get_or_create(customer=session_customer)
     cart.items.add(item)
 
-    return redirect(
-        "view_menu",
-        restaurant_id=item.restaurant_id,
-        username=username,
-    )
+    return redirect("view_menu", restaurant_id=item.restaurant_id, username=session_customer.username)
 
 
 @require_POST
 def remove_from_cart(request, username, item_id):
-    customer = get_object_or_404(
-        Customer,
-        username=username,
-    )
+    session_customer = _get_session_customer(request)
+    if not session_customer or session_customer.username.lower() != username.lower():
+        return redirect("open_signin")
 
-    cart = Cart.objects.filter(
-        customer=customer,
-    ).first()
-
+    cart = Cart.objects.filter(customer=session_customer).first()
     if cart:
-        item = get_object_or_404(
-            Item,
-            id=item_id,
-        )
+        item = get_object_or_404(Item, id=item_id)
         cart.items.remove(item)
 
-    return redirect(
-        "show_cart",
-        username=username,
-    )
+    return redirect("show_cart", username=session_customer.username)
 
 
 def show_cart(request, username):
-    customer = get_object_or_404(
-        Customer,
-        username=username,
-    )
+    session_customer = _get_session_customer(request)
+    if not session_customer or session_customer.username.lower() != username.lower():
+        return redirect("open_signin")
 
-    cart = Cart.objects.filter(
-        customer=customer,
-    ).first()
-
-    items = (
-        cart.items.select_related("restaurant").all()
-        if cart
-        else []
-    )
-
-    total_price = (
-        cart.total_price()
-        if cart
-        else Decimal("0.00")
-    )
+    cart = Cart.objects.filter(customer=session_customer).first()
+    items = cart.items.select_related("restaurant").all() if cart else []
+    total_price = cart.total_price() if cart else Decimal("0.00")
 
     return render(
         request,
@@ -420,48 +366,35 @@ def show_cart(request, username):
         {
             "itemList": items,
             "total_price": total_price,
-            "username": username,
+            "username": session_customer.username,
         },
     )
 
 
+# ==============================================================================
+# Checkout & Razorpay Payment Flow
+# ==============================================================================
+
 def checkout(request, username):
     session_customer = _get_session_customer(request)
-
-    if not session_customer or session_customer.username != username:
+    if not session_customer or session_customer.username.lower() != username.lower():
         return redirect("open_signin")
 
-    cart = Cart.objects.filter(
-        customer=session_customer,
-    ).first()
-
+    cart = Cart.objects.filter(customer=session_customer).first()
     if not cart or not cart.items.exists():
         return render(
             request,
             "checkout.html",
             {
                 "error": "Your cart is empty.",
-                "username": username,
+                "username": session_customer.username,
             },
         )
 
-    items = list(
-        cart.items.select_related("restaurant").all()
-    )
-
-    subtotal = sum(
-        (item.price for item in items),
-        Decimal("0.00"),
-    )
-
-    gst = (
-        subtotal * GST_RATE
-    ).quantize(Decimal("0.01"))
-
-    total_price = (
-        subtotal + gst
-    ).quantize(Decimal("0.01"))
-
+    items = list(cart.items.select_related("restaurant").all())
+    subtotal = sum((item.price for item in items), Decimal("0.00"))
+    gst = (subtotal * GST_RATE).quantize(Decimal("0.01"))
+    total_price = (subtotal + gst).quantize(Decimal("0.01"))
     amount_paise = int(total_price * 100)
 
     pending_order = Order.objects.create(
@@ -483,12 +416,27 @@ def checkout(request, username):
         ]
     )
 
-    client = razorpay.Client(
-        auth=(
-            settings.RAZORPAY_KEY_ID,
-            settings.RAZORPAY_KEY_SECRET,
+    razorpay_key = getattr(settings, "RAZORPAY_KEY_ID", "")
+    razorpay_secret = getattr(settings, "RAZORPAY_KEY_SECRET", "")
+
+    if not razorpay_key or not razorpay_secret:
+        logger.error("Razorpay API credentials are not set in settings.")
+        pending_order.status = "failed"
+        pending_order.save(update_fields=["status"])
+        return render(
+            request,
+            "checkout.html",
+            {
+                "username": session_customer.username,
+                "cart_items": items,
+                "subtotal": subtotal,
+                "gst": gst,
+                "total_price": total_price,
+                "error": "Payment service is currently unavailable. Please verify payment credentials.",
+            },
         )
-    )
+
+    client = razorpay.Client(auth=(razorpay_key, razorpay_secret))
 
     try:
         razorpay_order = client.order.create(
@@ -497,60 +445,43 @@ def checkout(request, username):
                 "currency": "INR",
                 "payment_capture": 1,
                 "notes": {
-                    "mealmate_order_id": str(
-                        pending_order.pk
-                    ),
-                    "customer_id": str(
-                        session_customer.pk
-                    ),
+                    "mealmate_order_id": str(pending_order.pk),
+                    "customer_id": str(session_customer.pk),
                 },
             }
         )
-
     except Exception:
-        logger.exception(
-            "Razorpay order creation failed for local order %s",
-            pending_order.pk,
-        )
-
+        logger.exception("Razorpay order creation failed for local order %s", pending_order.pk)
         pending_order.status = "failed"
-        pending_order.save(
-            update_fields=["status"]
-        )
-
+        pending_order.save(update_fields=["status"])
         return render(
             request,
             "checkout.html",
             {
-                "username": username,
+                "username": session_customer.username,
                 "cart_items": items,
                 "subtotal": subtotal,
                 "gst": gst,
                 "total_price": total_price,
-                "error": (
-                    "Unable to create the payment order. "
-                    "Please try again."
-                ),
+                "error": "Unable to initiate payment with Razorpay. Please try again.",
             },
         )
 
     pending_order.razorpay_order_id = razorpay_order["id"]
-    pending_order.save(
-        update_fields=["razorpay_order_id"]
-    )
+    pending_order.save(update_fields=["razorpay_order_id"])
 
     return render(
         request,
         "checkout.html",
         {
-            "username": username,
+            "username": session_customer.username,
             "customer_email": session_customer.email,
             "customer_mobile": session_customer.mobile,
             "cart_items": items,
             "subtotal": subtotal,
             "gst": gst,
             "total_price": total_price,
-            "razorpay_key_id": settings.RAZORPAY_KEY_ID,
+            "razorpay_key_id": razorpay_key,
             "order_id": razorpay_order["id"],
             "amount_paise": amount_paise,
         },
@@ -559,75 +490,35 @@ def checkout(request, username):
 
 @require_POST
 def payment_view(request):
-    payment_id = request.POST.get(
-        "razorpay_payment_id"
-    )
-    razorpay_order_id = request.POST.get(
-        "razorpay_order_id"
-    )
-    signature = request.POST.get(
-        "razorpay_signature"
-    )
+    payment_id = request.POST.get("razorpay_payment_id")
+    razorpay_order_id = request.POST.get("razorpay_order_id")
+    signature = request.POST.get("razorpay_signature")
 
     customer = _get_session_customer(request)
-
     if not customer:
-        return HttpResponse(
-            "Authentication required.",
-            status=401,
-        )
+        return HttpResponse("Authentication required.", status=401)
 
-    if not all(
-        [
-            payment_id,
-            razorpay_order_id,
-            signature,
-        ]
-    ):
-        return HttpResponse(
-            "Payment verification data is incomplete.",
-            status=400,
-        )
+    if not all([payment_id, razorpay_order_id, signature]):
+        return HttpResponse("Payment verification data is incomplete.", status=400)
 
     local_order = (
-        Order.objects
-        .prefetch_related("items")
-        .filter(
-            razorpay_order_id=razorpay_order_id,
-            customer=customer,
-        )
+        Order.objects.prefetch_related("items")
+        .filter(razorpay_order_id=razorpay_order_id, customer=customer)
         .first()
     )
 
     if not local_order:
-        logger.warning(
-            "Razorpay order %s was not found for customer %s",
-            razorpay_order_id,
-            customer.pk,
-        )
-
-        return HttpResponse(
-            "Payment order could not be found.",
-            status=400,
-        )
+        logger.warning("Razorpay order %s was not found for customer %s", razorpay_order_id, customer.pk)
+        return HttpResponse("Payment order could not be found.", status=400)
 
     if local_order.status == "paid":
-        return redirect(
-            "orders",
-            username=customer.username,
-        )
+        return redirect("orders", username=customer.username)
 
     if local_order.status != "pending":
-        return HttpResponse(
-            "This payment order is no longer active.",
-            status=409,
-        )
+        return HttpResponse("This payment order is no longer active.", status=409)
 
     client = razorpay.Client(
-        auth=(
-            settings.RAZORPAY_KEY_ID,
-            settings.RAZORPAY_KEY_SECRET,
-        )
+        auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
     )
 
     try:
@@ -638,133 +529,64 @@ def payment_view(request):
                 "razorpay_signature": signature,
             }
         )
-
     except razorpay.errors.SignatureVerificationError:
-        logger.warning(
-            "Invalid Razorpay signature for local order %s",
-            local_order.pk,
-        )
-
-        return HttpResponse(
-            "Payment verification failed.",
-            status=400,
-        )
-
+        logger.warning("Invalid Razorpay signature for local order %s", local_order.pk)
+        return HttpResponse("Payment verification failed.", status=400)
     except Exception:
-        logger.exception(
-            "Unexpected Razorpay signature verification error "
-            "for local order %s",
-            local_order.pk,
-        )
-
-        return HttpResponse(
-            "Payment verification failed.",
-            status=400,
-        )
+        logger.exception("Unexpected Razorpay signature error for local order %s", local_order.pk)
+        return HttpResponse("Payment verification failed.", status=400)
 
     try:
-        razorpay_order = client.order.fetch(
-            razorpay_order_id
-        )
-
+        razorpay_order = client.order.fetch(razorpay_order_id)
     except Exception:
-        logger.exception(
-            "Unable to fetch Razorpay order %s",
-            razorpay_order_id,
-        )
+        logger.exception("Unable to fetch Razorpay order %s", razorpay_order_id)
+        return HttpResponse("Unable to verify payment amount.", status=400)
 
-        return HttpResponse(
-            "Unable to verify payment amount.",
-            status=400,
-        )
+    expected_amount_paise = int(local_order.total_price * 100)
+    received_amount_paise = int(razorpay_order.get("amount", 0))
+    received_currency = razorpay_order.get("currency")
 
-    expected_amount_paise = int(
-        local_order.total_price * 100
-    )
-
-    received_amount_paise = int(
-        razorpay_order.get("amount", 0)
-    )
-
-    received_currency = razorpay_order.get(
-        "currency"
-    )
-
-    if (
-        received_amount_paise
-        != expected_amount_paise
-        or received_currency != "INR"
-    ):
+    if received_amount_paise != expected_amount_paise or received_currency != "INR":
         local_order.status = "failed"
-        local_order.save(
-            update_fields=["status"]
-        )
-
+        local_order.save(update_fields=["status"])
         logger.error(
-            "Payment amount mismatch for local order %s: "
-            "expected=%s received=%s currency=%s",
+            "Payment mismatch for order %s: expected=%s received=%s currency=%s",
             local_order.pk,
             expected_amount_paise,
             received_amount_paise,
             received_currency,
         )
-
-        return HttpResponse(
-            "Payment amount verification failed.",
-            status=400,
-        )
+        return HttpResponse("Payment amount verification failed.", status=400)
 
     with transaction.atomic():
-        locked_order = (
-            Order.objects
-            .select_for_update()
-            .get(pk=local_order.pk)
-        )
-
+        locked_order = Order.objects.select_for_update().get(pk=local_order.pk)
         if locked_order.status == "paid":
-            return redirect(
-                "orders",
-                username=customer.username,
-            )
+            return redirect("orders", username=customer.username)
 
         locked_order.razorpay_payment_id = payment_id
         locked_order.status = "paid"
-        locked_order.save(
-            update_fields=[
-                "razorpay_payment_id",
-                "status",
-            ]
-        )
+        locked_order.save(update_fields=["razorpay_payment_id", "status"])
 
-        cart = Cart.objects.filter(
-            customer=customer
-        ).first()
-
+        cart = Cart.objects.filter(customer=customer).first()
         if cart:
-            order_items = list(
-                locked_order.items.select_related("item").all()
-            )
-
+            order_items = list(locked_order.items.select_related("item").all())
             if order_items:
-                cart.items.remove(
-                    *(order_item.item for order_item in order_items)
-                )
+                cart.items.remove(*(order_item.item for order_item in order_items))
 
-    return redirect(
-        "orders",
-        username=customer.username,
-    )
+    return redirect("orders", username=customer.username)
 
+
+# ==============================================================================
+# Orders & Profile Views
+# ==============================================================================
 
 def orders(request, username):
-    customer = get_object_or_404(
-        Customer,
-        username=username,
-    )
+    session_customer = _get_session_customer(request)
+    if not session_customer or session_customer.username.lower() != username.lower():
+        return redirect("open_signin")
 
     order = (
-        customer.orders
-        .prefetch_related("items")
+        session_customer.orders.prefetch_related("items")
         .order_by("-created_at")
         .first()
     )
@@ -773,95 +595,45 @@ def orders(request, username):
         request,
         "orders.html",
         {
-            "username": username,
-            "customer": customer,
+            "username": session_customer.username,
+            "customer": session_customer,
             "order": order,
-            "order_items": (
-                order.items.all()
-                if order
-                else []
-            ),
-            "total_price": (
-                order.total_price
-                if order
-                else Decimal("0.00")
-            ),
+            "order_items": order.items.all() if order else [],
+            "total_price": order.total_price if order else Decimal("0.00"),
         },
     )
 
 
 def profile(request, username):
-    customer = get_object_or_404(
-        Customer,
-        username=username,
-    )
+    session_customer = _get_session_customer(request)
+    if not session_customer or session_customer.username.lower() != username.lower():
+        return redirect("open_signin")
 
     return render(
         request,
         "profile.html",
         {
-            "username": username,
-            "customer": customer,
+            "username": session_customer.username,
+            "customer": session_customer,
         },
     )
 
 
 def profile_default(request):
-    username = request.session.get("username")
-
-    if username:
-        return redirect(
-            "profile",
-            username=username,
-        )
-
+    session_customer = _get_session_customer(request)
+    if session_customer:
+        return redirect("profile", username=session_customer.username)
     return redirect("open_signin")
-
-
-def customer_home(request, username):
-    if request.session.get("username") != username:
-        return redirect("open_signin")
-
-    return render(
-        request,
-        "customer_home.html",
-        {
-            "restaurantList": Restaurant.objects.all(),
-            "username": username,
-        },
-    )
 
 
 @require_POST
 def save_profile(request):
-    username = request.session.get("username")
-
-    if not username:
+    session_customer = _get_session_customer(request)
+    if not session_customer:
         return redirect("open_signin")
 
-    customer = get_object_or_404(
-        Customer,
-        username=username,
-    )
+    session_customer.mobile = request.POST.get("mobile", "").strip()
+    session_customer.address = request.POST.get("address", "").strip()
+    session_customer.save(update_fields=["mobile", "address"])
 
-    customer.mobile = request.POST.get(
-        "mobile",
-        "",
-    ).strip()
-
-    customer.address = request.POST.get(
-        "address",
-        "",
-    ).strip()
-
-    customer.save(
-        update_fields=[
-            "mobile",
-            "address",
-        ]
-    )
-
-    return redirect(
-        "profile",
-        username=username,
-    )
+    return redirect("profile", username=session_customer.username)
