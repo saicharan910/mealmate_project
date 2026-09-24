@@ -1,6 +1,5 @@
 from pathlib import Path
 import os
-
 import dj_database_url
 from dotenv import load_dotenv
 
@@ -10,11 +9,15 @@ load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.environ.get("SECRET_KEY")
 if not SECRET_KEY:
-    raise RuntimeError("SECRET_KEY environment variable is required")
+    if os.environ.get("DEBUG", "False").lower() == "true":
+        SECRET_KEY = "django-insecure-dev-fallback-key-replace-in-production"
+    else:
+        raise RuntimeError("SECRET_KEY environment variable is required")
 
 DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
 
-render_hostname = os.environ.get("https://mealmate-project-9ybt.onrender.com")
+# Host & Origin Setup
+render_hostname = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
 allowed_hosts = os.environ.get("ALLOWED_HOSTS", "")
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(",") if host.strip()]
 ALLOWED_HOSTS.extend(["mealmate-project-9ybt.onrender.com", "localhost", "127.0.0.1"])
@@ -22,11 +25,6 @@ ALLOWED_HOSTS.extend(["mealmate-project-9ybt.onrender.com", "localhost", "127.0.
 if render_hostname:
     ALLOWED_HOSTS.append(render_hostname)
 ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
-
-if DEBUG:
-    ALLOWED_HOSTS.extend(["localhost", "127.0.0.1"])
-else:
-    ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
 
 csrf_origins = os.environ.get("CSRF_TRUSTED_ORIGINS", "")
 CSRF_TRUSTED_ORIGINS = [
@@ -66,9 +64,10 @@ ROOT_URLCONF = "mealmate.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "delivery" / "templates",
-                BASE_DIR / "templates",],
-        
+        "DIRS": [
+            BASE_DIR / "delivery" / "templates",
+            BASE_DIR / "templates",
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -81,13 +80,13 @@ TEMPLATES = [
     }
 ]
 
-# Auth Redirects
-LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'home'
-LOGOUT_REDIRECT_URL = 'login'
+# Auth Redirects matching delivery/urls.py
+LOGIN_URL = "open_signin"
+LOGOUT_REDIRECT_URL = "open_signin"
 
 WSGI_APPLICATION = "mealmate.wsgi.application"
 
+# Database Configuration
 database_url = os.environ.get("DATABASE_URL")
 if not database_url:
     if DEBUG:
@@ -133,11 +132,9 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-RAZORPAY_KEY_ID = os.environ.get("RZP_KEY_ID")
-RAZORPAY_KEY_SECRET = os.environ.get("RZP_KEY_SECRET")
-
-if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
-    raise RuntimeError("RZP_KEY_ID and RZP_KEY_SECRET environment variables are required")
+# Razorpay Configuration (checks both key conventions)
+RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID") or os.environ.get("RZP_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET") or os.environ.get("RZP_KEY_SECRET", "")
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
